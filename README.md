@@ -20,7 +20,7 @@ This repository contains the code, data, and models of the paper titled [**"Cros
   
 ***Disclaimer: You must agree to the [license](#license) and terms of use before using the dataset.***
 
-We are currently releasing a preliminary version of the dataset which has been used for the experiments in the paper. Currently the dataset contains a good amount of data leakage. We will release a cleaner version of the dataset shortly.
+We are currently releasing a preliminary version of the dataset which has been used for the experiments in the paper. Currently the dataset contains a good amount of data leakage from the training set to the evaluation sets. We will release a cleaner version of the dataset shortly.
 
 An example article-summary pair from the `Japanese-Bengali` pair of the ***CrossSum*** dataset with corresponding English translations is given below:
 
@@ -36,7 +36,7 @@ The corresponding complete datapoint in the dataset is as follows:
 }
 ```
 
-The dataset files are organized in `.jsonl` format  i.e. one JSON per line. **Download the dataset from [here]().**
+The dataset files are organized in `.jsonl` format  i.e. one JSON per line. **Download the dataset from [here](https://drive.google.com/file/d/1GeMSiUsMW7X156FRXa8GaiihfA17psoO/view?usp=sharing).**
 
 
 No. of total examples for each language pair are as follows:
@@ -111,7 +111,7 @@ Contents of this repository are restricted to only non-commercial research purpo
 ## Citation
 If you use any of the datasets, models or code modules, please cite the following paper:
 ```
-@article{hasan2021crosssum,
+@article{bhattacharjee2021banglabert,
   author    = {Tahmid Hasan and Abhik Bhattacharjee and Wasi Uddin Ahmad and Yuan-Fang Li and Yong-bin Kang and Rifat Shahriyar},
   title     = {CrossSum: Beyond English-Centric Cross-Lingual Abstractive Text Summarization for 1500+ Language Pairs},
   journal   = {CoRR},
