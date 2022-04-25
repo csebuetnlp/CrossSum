@@ -69,7 +69,7 @@ LANG2ISO = {
     "marathi": "mr",
     "spanish": "es",
     "scottish_gaelic": "gd",
-    "nepali": "np",
+    "nepali": "ne",
     "pashto": "ps",
     "persian": "fa",
     "pidgin": "pcm",

@@ -231,7 +231,7 @@ def summarize_xlingual(
     tgt_lang,
     args
 ):
-    if os.path.isfile(os.path.join(output_dir, "test_generations.txt")):
+    if os.path.isfile(os.path.join(output_dir, f"{args.data_type}_generations.txt")):
         return
 
     script_path =  os.path.abspath("pipeline.py")
@@ -246,9 +246,10 @@ def summarize_xlingual(
         f"--no_repeat_ngram_size {args.no_repeat_ngram_size}",
         f"--eval_beams {args.beam_size}",
         f"--tgt_lang {tgt_lang}",
+        f"--rouge_lang {tgt_lang}",
         "--overwrite_output_dir",
         "--predict_with_generate",
-        "--do_predict" if args.data_type == "test" else "--do_eval",
+        "--do_predict",
         "--use_langid",
         "--seed 1234"        
     ]
@@ -272,8 +273,8 @@ def calculate_lase(
 
 
 def run(args):
-    root_output_dir = os.path.join(args.output_dir, args.data_type, args.evaluation_type, "outputs")
-    root_log_dir = os.path.join(args.output_dir, args.data_type, args.evaluation_type, "logs")
+    root_output_dir = os.path.join(args.output_dir, args.data_type, "outputs")
+    root_log_dir = os.path.join(args.output_dir, args.data_type, "logs")
 
     os.makedirs(root_output_dir, exist_ok=True)
     os.makedirs(root_log_dir, exist_ok=True)
@@ -346,21 +347,38 @@ def run(args):
                 pipeline_target_path
             )
 
+            # specially handly validation files
+            # since output file is generated for 
+            # test files only
+            if args.data_type == "val":
+                shutil.copy(
+                    pipeline_source_path,
+                    os.path.join(dir_name, "test.source")
+                )
+                shutil.copy(
+                    pipeline_source_path,
+                    os.path.join(dir_name, "test.target")
+                )
+
             if args.evaluation_type == "xlingual":
                 summarize_xlingual(dir_name, dir_name, tgt_lang, args)
+
+                if args.data_type == "val":
+                    shutil.move(
+                        os.path.join(dir_name, f"test_generations.txt"),
+                        os.path.join(dir_name, f"val_generations.txt")
+                    )
+
+                    os.remove(os.path.join(dir_name, "test.source"))
+                    os.remove(os.path.join(dir_name, "test.target"))
+
                 pred_lines = read_lines(
-                    os.path.join(dir_name, "test_generations.txt")
+                    os.path.join(dir_name, f"{args.data_type}_generations.txt")
                 )
                 ref_lines = read_lines(pipeline_target_path)
 
-                if lase_key == "LaSE_in_lang":
-                    scores.update(
-                        calculate_rouge(pred_lines, ref_lines, rouge_lang=tgt_lang)
-                    )
 
-                lase_scores = calculate_lase(pred_lines, ref_lines, tgt_lang)
-                scores[lase_key] = lase_scores["LaSE"]
-                
+
             elif args.evaluation_type == "baseline":
                 src_iso, tgt_iso = LANG2ISO.get(src_lang, None), LANG2ISO.get(tgt_lang, None)
                 if (
@@ -386,13 +404,13 @@ def run(args):
                 pred_lines = read_lines(translated_path)
                 ref_lines = read_lines(pipeline_target_path)
 
-                if lase_key == "LaSE_in_lang":
-                    scores.update(
-                        calculate_rouge(pred_lines, ref_lines, rouge_lang=tgt_lang)
-                    )
+            if lase_key == "LaSE_in_lang":
+                scores.update(
+                    calculate_rouge(pred_lines, ref_lines, rouge_lang=tgt_lang)
+                )
 
-                lase_scores = calculate_lase(pred_lines, ref_lines, tgt_lang)
-                scores[lase_key] = lase_scores["LaSE"]
+            lase_scores = calculate_lase(pred_lines, ref_lines, tgt_lang)
+            scores[lase_key] = lase_scores["LaSE"]
 
             
         # first do crossum evaluation (in lang LaSE)
@@ -411,7 +429,7 @@ def run(args):
         gc.collect()
 
     # aggregate results
-    combined_results_path = os.path.join(args.output_dir, args.data_type, args.evaluation_type, "combined_results.log")
+    combined_results_path = os.path.join(args.output_dir, args.data_type, "combined_results.log")
     logging.info("Writing the combined results to " + combined_results_path)
 
     with open(combined_results_path, 'w') as outf:

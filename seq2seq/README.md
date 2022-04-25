@@ -3,12 +3,14 @@ We use a modified fork of [huggingface transformers](https://github.com/huggingf
 ## Setup
 
 ```bash
-$ git clone https://github.com/abhik1505040/crossum
+$ git clone https://github.com/csebuetnlp/crossum
 $ cd crossum/seq2seq
 $ conda create python==3.7.9 pytorch==1.7.1 torchvision==0.8.2 torchaudio==0.7.2 cudatoolkit=10.2 -c pytorch -p ./env
 $ conda activate ./env # or source activate ./env (for older versions of anaconda)
 $ bash setup.sh 
 ```
+
+- **Note**: For newer NVIDIA GPUS such as ***A100*** or ***3090*** use `cudatoolkit=11.1`.
 
 ## Downloading data
 
@@ -30,7 +32,7 @@ Some sample commands for training on a 8 GPU node are given below.
 For multi-node usage with SLURM, refer to [job.sh]().
 
 ```bash
-bash trainer.sh --ngpus 8 --training_type m2m # trains the many-to-many model
+bash trainer.sh --ngpus 8 --training_type m2m --sampling multistage # trains the many-to-many model with multistage sampling
 bash trainer.sh --ngpus 8 --training_type m2o --pivot_lang arabic # trains the many-to-one model using arabic as the target language
 bash trainer.sh --ngpus 8 --training_type o2m --pivot_lang english # trains the one-to-many model using english as the source language
 ```

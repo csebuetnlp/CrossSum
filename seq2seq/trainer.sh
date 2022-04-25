@@ -10,6 +10,8 @@ parser.add_argument('--training_type', type=str, choices=["m2m", "m2o", "o2m"],
                     required=True, help='Training type (many-to-many/many-to-one/one-to-many)')
 parser.add_argument('--pivot_lang', type=str, default="english",
                     help='Pivot language (Applicable for many-to-one and one-to-many)')
+parser.add_argument('--sampling', type=str, default="multistage", choices=["multistage", "unistage"],
+                    help='Sampling type (Applicable for many-to-many)')
 parser.add_argument('--exclude_native', action='store_true',
                     default=False, help='Exclude the native-to-native filepairs during training')
 EOF
@@ -22,10 +24,17 @@ export ROOT_OUTPUT_DIR="${BASE_DIR}/output"
 
 export PREFIX="${TRAINING_TYPE}_${PIVOT_LANG}"
 if [[ "$TRAINING_TYPE" = "m2m" ]]; then
-    PREFIX="${TRAINING_TYPE}"
+    PREFIX="${TRAINING_TYPE}_${SAMPLING}" 
     OPTIONAL_ARGS=(
         "--multistage_upsampling_factors 0.5 0.75"
     )
+    
+    if [[ "$SAMPLING" = "unistage" ]]; then
+        OPTIONAL_ARGS=(
+            "--upsampling_factor 0.25"
+        )   
+    fi
+    
 else
     OPTIONAL_ARGS=(
         "--upsampling_factor 0.75"
@@ -40,7 +49,7 @@ fi
 export BASENAME="${PREFIX}_${SUFFIX}"
 export INPUT_DIR="${ROOT_INPUT_DIR}/${BASENAME}"
 export OUTPUT_DIR="${ROOT_OUTPUT_DIR}/${BASENAME}"
-export MIN_EXAMPLE_COUNT=32
+export MIN_EXAMPLE_COUNT=30
 
 conda activate "${BASE_DIR}/env" || source activate "${BASE_DIR}/env"
 
