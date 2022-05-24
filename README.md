@@ -124,7 +124,7 @@ Contents of this repository are restricted to only non-commercial research purpo
 ## Citation
 If you use any of the datasets, models or code modules, please cite the following paper:
 ```
-@article{hasan2021crosssum,
+@article{bhattacharjee2021crosssum,
   author    = {Abhik Bhattacharjee and Tahmid Hasan and Wasi Uddin Ahmad and Yuan-Fang Li and Yong-bin Kang and Rifat Shahriyar},
   title     = {CrossSum: Beyond English-Centric Cross-Lingual Abstractive Text Summarization for 1500+ Language Pairs},
   journal   = {CoRR},
