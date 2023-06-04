@@ -183,6 +183,13 @@ class DataTrainingArguments:
             "choices": ["encoder", "decoder", "both"]
         }    
     )
+    minibatching: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Minibatching options",
+            "choices": ["ignored", "fixed_src", "fixed_tgt"]
+        }    
+    )
     tie_word_embeddings: bool = field(
         default=False,
         metadata={
@@ -499,7 +506,8 @@ def main():
             "gradient_accum": training_args.gradient_accumulation_steps,
             "is_distributed": bool(training_args.local_rank != -1),
             "dataset_class": dataset_class,
-            "per_lang_batch_size": data_args.per_lang_batch_size
+            "per_lang_batch_size": data_args.per_lang_batch_size,
+            "minibatching": data_args.minibatching
         }
         train_dataset = (
             CrosslingualDataset(

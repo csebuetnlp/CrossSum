@@ -283,7 +283,7 @@ class UnistageCrosslingualDataset(Dataset):
             )
             self.dataloaders.append(dataloader)
             
-        assert len(self.dataloaders) > 1, "multiple source/target filepairs required for MultiDataset"
+        # assert len(self.dataloaders) > 1, "multiple source/target filepairs required for MultiDataset"
         # compute effective length of this dataset and the sampling probabilities
         logger.info(f"Found datasets: {len(self.dataloaders)}")
         upsampling_factor = dataset_kwargs.get("upsampling_factor")
@@ -375,12 +375,14 @@ class CrosslingualDataset(Dataset):
         assert "gradient_accum" in dataset_kwargs, "gradient_accum required"
         assert "is_distributed" in dataset_kwargs, "is_distributed required"
         assert "dataset_class" in dataset_kwargs, "dataset_class required"
+        assert "minibatching" in dataset_kwargs, "minibatching required"
         
         logger.info("Using cross lingual dataset")
         self.dataloaders = {}
         self.total_batch_size = dataset_kwargs.pop("total_batch_size")
         dataset_class = dataset_kwargs.pop("dataset_class")
         extension = "tokenized" if dataset_class == TokenizedDataset else "source"
+        self.minibatching = dataset_kwargs.pop("minibatching")
         
         # identify all source training files
         forward_datapoint_counts = {}
@@ -522,7 +524,19 @@ class CrosslingualDataset(Dataset):
         is_distributed = dataset_kwargs.get("is_distributed")
         actual_batch_size = dataset_kwargs.get("actual_batch_size")
         gradient_accum = dataset_kwargs.get("gradient_accum")
+        
+        # for choosing whether src or tgt will be fixed when taking a batch
+        self.choice = -1
+
         self.per_lang_batch_size = dataset_kwargs.get("per_lang_batch_size")
+        if self.minibatching is not None:
+            if self.minibatching == "ignored":
+                self.per_lang_batch_size = self.total_batch_size
+            elif self.minibatching == "fixed_src":
+                self.choice = 0
+            elif self.minibatching == "fixed_tgt":
+                self.choice = 1
+
         self.per_gpu_effective_batch_size = actual_batch_size * gradient_accum
         self.per_gpu_lang_batch_size = self.per_lang_batch_size // (self.total_batch_size // self.per_gpu_effective_batch_size)
 
@@ -531,10 +545,8 @@ class CrosslingualDataset(Dataset):
         self.pos_shift_count = rank * self.per_gpu_lang_batch_size
         logger.info(f'Rank: {rank}, shifting required: {self.pos_shift_count}')
         logger.info(f"Effective length: {self.effective_length}")
-
-        # for choosing whether src or tgt will be fixed when taking a batch
-        self.choice = -1
-                
+        logger.info(f"Minibatching type:" + str(self.minibatching))
+        
         self.current_src_lang = None
         self.current_tgt_lang = None
         self.current_src_loader_count = 0
@@ -559,7 +571,10 @@ class CrosslingualDataset(Dataset):
         return self.effective_length
 
     def __getitem__(self, index):
-        if self.current_src_loader_count + self.current_tgt_loader_count == 0:
+        if (
+            not (self.minibatching is not None and self.minibatching.startswith("fixed")) 
+            and (self.current_src_loader_count + self.current_tgt_loader_count == 0)
+        ):
             self.choice = np.random.choice([0, 1], p=[0.5, 0.5])
 
         if self.choice == 0:

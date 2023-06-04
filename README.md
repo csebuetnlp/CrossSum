@@ -34,7 +34,7 @@ The corresponding complete datapoint in the dataset is as follows:
 }
 ```
 
-The dataset files are organized in `.jsonl` format  i.e. one JSON per line. **Download the dataset from [here](https://drive.google.com/file/d/1HvzrOFPzD2CSvZICUQw4a4EbtX91-hCD/view?usp=sharing).**
+The dataset files are organized in `.jsonl` format  i.e. one JSON per line. **Download the dataset from [here](https://drive.google.com/file/d/11yCJxK5necOyZBxcJ6jncdCFgNxrsl4m/view).** It is also available on [Huggingface Datasets](https://huggingface.co/datasets/csebuetnlp/CrossSum)
 
 No. of total examples for each language pair are as follows:
 

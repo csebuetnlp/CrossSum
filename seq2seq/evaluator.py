@@ -7,6 +7,8 @@ import logging
 import json
 from tqdm import tqdm
 import numpy as np
+import torch
+import multiprocessing
 from generate_data import get_lc
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from LaSE import LaSEScorer 
@@ -14,7 +16,7 @@ from LaSE.utils import LANG2ISO
 from utils import calculate_rouge
 
 logging.basicConfig(level=logging.INFO)
-
+args = None
 
 def get_parser():
 
@@ -162,7 +164,6 @@ def summarize_and_translate(
     translation_path,
     src_lang,
     tgt_lang,
-    args
 ):
 
     global _LOADED_MODELS
@@ -229,7 +230,6 @@ def summarize_xlingual(
     input_dir,
     output_dir,
     tgt_lang,
-    args
 ):
     if os.path.isfile(os.path.join(output_dir, f"{args.data_type}_generations.txt")):
         return
@@ -251,7 +251,8 @@ def summarize_xlingual(
         "--predict_with_generate",
         "--do_predict",
         "--use_langid",
-        "--seed 1234"        
+        "--seed 1234",
+        "--no_cuda" if not args.device.startswith("cuda") else ""        
     ]
 
     cmd = "python " + script_path + " " + " ".join(script_args)
@@ -263,16 +264,140 @@ def calculate_lase(
     tgt_lns,
     tgt_lang
 ):
-    global _LASE_SCORER
     scores = [_LASE_SCORER.score(ref.strip(), pred.strip(), target_lang=tgt_lang) 
                     for ref, pred in zip(tgt_lns, pred_lns)]
 
+    avg = lambda k: round(np.mean([getattr(score, k) for score in scores]) * 100, 4)
     return {
-        "LaSE": round(np.mean(scores) * 100, 4)
+        k: avg(k) for k in ["ms", "lc", "lp", "LaSE"]
     }
 
 
-def run(args):
+def process_pair(pair):
+    root_output_dir = os.path.join(args.output_dir, args.data_type, "outputs")
+    root_log_dir = os.path.join(args.output_dir, args.data_type, "logs")
+
+    source_suffix = f"_{args.data_type}.source"
+    target_suffix = f"_{args.data_type}.target"
+
+    src_lang, tgt_lang = pair.split("-")
+    scores = {}
+    log_path = os.path.join(root_log_dir, pair + ".log")
+
+    if os.path.isfile(log_path):
+        return
+
+    def evaluate(lase_key):
+        dir_prefix = pair + "-" + ("crossum" if lase_key == "LaSE_in_lang" else "xlsum")
+        dir_name = os.path.join(root_output_dir, dir_prefix)
+        os.makedirs(dir_name, exist_ok=True)
+        
+        prefix = pair if lase_key == "LaSE_in_lang" else f"{src_lang}-{src_lang}"
+        root_source_path = os.path.join(args.dataset_dir, prefix + source_suffix)
+        pipeline_source_path = os.path.join(dir_name, source_suffix[1:])
+        root_target_path = os.path.join(args.dataset_dir, prefix + target_suffix)
+        pipeline_target_path = os.path.join(dir_name, target_suffix[1:])
+
+        if (
+                not os.path.isfile(root_source_path) or
+                not os.path.isfile(root_target_path) or
+                get_lc(root_target_path) == 0
+        ):
+            return
+        
+        shutil.copy(
+            root_source_path,
+            pipeline_source_path
+        )
+
+        shutil.copy(
+            root_target_path,
+            pipeline_target_path
+        )
+
+        # specially handly validation files
+        # since output file is generated for 
+        # test files only
+        if args.data_type == "val":
+            shutil.copy(
+                pipeline_source_path,
+                os.path.join(dir_name, "test.source")
+            )
+            shutil.copy(
+                pipeline_target_path,
+                os.path.join(dir_name, "test.target")
+            )
+
+        if args.evaluation_type == "xlingual":
+            summarize_xlingual(dir_name, dir_name, tgt_lang, args)
+
+            if args.data_type == "val":
+                shutil.move(
+                    os.path.join(dir_name, f"test_generations.txt"),
+                    os.path.join(dir_name, f"val_generations.txt")
+                )
+
+                os.remove(os.path.join(dir_name, "test.source"))
+                os.remove(os.path.join(dir_name, "test.target"))
+
+            pred_lines = read_lines(
+                os.path.join(dir_name, f"{args.data_type}_generations.txt")
+            )
+            ref_lines = read_lines(pipeline_target_path)
+
+
+
+        elif args.evaluation_type == "baseline":
+            src_iso, tgt_iso = LANG2ISO.get(src_lang, None), LANG2ISO.get(tgt_lang, None)
+            if (
+                    not src_iso or 
+                    not tgt_iso or 
+                    src_iso not in _LOADED_MODELS["translation"]["tokenizer"].lang_code_to_token or
+                    tgt_iso not in _LOADED_MODELS["translation"]["tokenizer"].lang_code_to_token
+            ):
+                return
+
+            summarized_path = pipeline_source_path + ".summarized"
+            translated_path = summarized_path + ".translated"
+
+            summarize_and_translate(
+                pipeline_source_path,
+                summarized_path,
+                translated_path,
+                src_iso,
+                tgt_iso,
+            )
+
+            pred_lines = read_lines(translated_path)
+            ref_lines = read_lines(pipeline_target_path)
+
+        if lase_key == "LaSE_in_lang":
+            scores.update(
+                calculate_rouge(pred_lines, ref_lines, rouge_lang=tgt_lang)
+            )
+
+        lase_scores = calculate_lase(pred_lines, ref_lines, tgt_lang)
+        for k in lase_scores:
+            scores[f"{lase_key}_{k}"] = lase_scores[k]
+
+        
+    # first do crossum evaluation (in lang LaSE)
+    evaluate("LaSE_in_lang")
+
+    # if src_lang != tgt_lang:
+    #     # now do xlsum evaluation (out lang LaSE)
+    #     evaluate("LaSE_out_lang")
+        
+    # write combined results
+    write_json(
+        scores, 
+        log_path
+    )
+
+    gc.collect()
+
+    
+def run():
     root_output_dir = os.path.join(args.output_dir, args.data_type, "outputs")
     root_log_dir = os.path.join(args.output_dir, args.data_type, "logs")
 
@@ -310,123 +435,9 @@ def run(args):
                             if k.split("-")[1] == args.required_tgt_lang]
 
     required_pairs = sorted(required_pairs)
-    
-    for pair in tqdm(required_pairs, desc="Running evaluation"):
-        src_lang, tgt_lang = pair.split("-")
-        scores = {}
-        log_path = os.path.join(root_log_dir, pair + ".log")
 
-        if os.path.isfile(log_path):
-            continue
-
-        def evaluate(lase_key):
-            dir_prefix = pair + "-" + ("crossum" if lase_key == "LaSE_in_lang" else "xlsum")
-            dir_name = os.path.join(root_output_dir, dir_prefix)
-            os.makedirs(dir_name, exist_ok=True)
-            
-            prefix = pair if lase_key == "LaSE_in_lang" else f"{src_lang}-{src_lang}"
-            root_source_path = os.path.join(args.dataset_dir, prefix + source_suffix)
-            pipeline_source_path = os.path.join(dir_name, source_suffix[1:])
-            root_target_path = os.path.join(args.dataset_dir, prefix + target_suffix)
-            pipeline_target_path = os.path.join(dir_name, target_suffix[1:])
-
-            if (
-                    not os.path.isfile(root_source_path) or
-                    not os.path.isfile(root_target_path) or
-                    get_lc(root_target_path) == 0
-            ):
-                return
-            
-            shutil.copy(
-                root_source_path,
-                pipeline_source_path
-            )
-
-            shutil.copy(
-                root_target_path,
-                pipeline_target_path
-            )
-
-            # specially handly validation files
-            # since output file is generated for 
-            # test files only
-            if args.data_type == "val":
-                shutil.copy(
-                    pipeline_source_path,
-                    os.path.join(dir_name, "test.source")
-                )
-                shutil.copy(
-                    pipeline_source_path,
-                    os.path.join(dir_name, "test.target")
-                )
-
-            if args.evaluation_type == "xlingual":
-                summarize_xlingual(dir_name, dir_name, tgt_lang, args)
-
-                if args.data_type == "val":
-                    shutil.move(
-                        os.path.join(dir_name, f"test_generations.txt"),
-                        os.path.join(dir_name, f"val_generations.txt")
-                    )
-
-                    os.remove(os.path.join(dir_name, "test.source"))
-                    os.remove(os.path.join(dir_name, "test.target"))
-
-                pred_lines = read_lines(
-                    os.path.join(dir_name, f"{args.data_type}_generations.txt")
-                )
-                ref_lines = read_lines(pipeline_target_path)
-
-
-
-            elif args.evaluation_type == "baseline":
-                src_iso, tgt_iso = LANG2ISO.get(src_lang, None), LANG2ISO.get(tgt_lang, None)
-                if (
-                        not src_iso or 
-                        not tgt_iso or 
-                        src_iso not in _LOADED_MODELS["translation"]["tokenizer"].lang_code_to_token or
-                        tgt_iso not in _LOADED_MODELS["translation"]["tokenizer"].lang_code_to_token
-                ):
-                    return
-
-                summarized_path = pipeline_source_path + ".summarized"
-                translated_path = summarized_path + ".translated"
-
-                summarize_and_translate(
-                    pipeline_source_path,
-                    summarized_path,
-                    translated_path,
-                    src_iso,
-                    tgt_iso,
-                    args
-                )
-
-                pred_lines = read_lines(translated_path)
-                ref_lines = read_lines(pipeline_target_path)
-
-            if lase_key == "LaSE_in_lang":
-                scores.update(
-                    calculate_rouge(pred_lines, ref_lines, rouge_lang=tgt_lang)
-                )
-
-            lase_scores = calculate_lase(pred_lines, ref_lines, tgt_lang)
-            scores[lase_key] = lase_scores["LaSE"]
-
-            
-        # first do crossum evaluation (in lang LaSE)
-        evaluate("LaSE_in_lang")
-
-        if src_lang != tgt_lang:
-            # now do xlsum evaluation (out lang LaSE)
-            evaluate("LaSE_out_lang")
-            
-        # write combined results
-        write_json(
-            scores, 
-            log_path
-        )
-
-        gc.collect()
+    for pair in required_pairs:
+        process_pair(pair)
 
     # aggregate results
     combined_results_path = os.path.join(args.output_dir, args.data_type, "combined_results.log")
@@ -437,7 +448,11 @@ def run(args):
             os.path.join(root_log_dir, "*.log")
         )
         
-        keys = ["Language pair", "rouge1", "rouge2", "rougeL", "LaSE_in_lang", "LaSE_out_lang"]
+        keys = ["Language pair", "rouge1", "rouge2", "rougeL"] + [
+            f"{lase_key}_{k}" for lase_key in ["LaSE_in_lang", "LaSE_out_lang"] 
+                for k in ["ms", "lc", "lp", "LaSE"]
+        ]
+
         row_format = "{}\t" * (len(keys) - 1) + "{}"
         
         header = row_format.format(*keys)
@@ -456,4 +471,4 @@ def run(args):
 if __name__ == "__main__":
     parser = get_parser()
     args = parser.parse_args()
-    run(args)
+    run()

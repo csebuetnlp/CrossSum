@@ -4,8 +4,10 @@ import numpy as np
 from rouge_score import rouge_scorer
 from .utils import load_langid_model, LANG2ISO, FASTTEXT_LANGS
 from sentence_transformers import SentenceTransformer
+from collections import namedtuple
 
 logger = logging.getLogger(__name__)
+LaSEResult = namedtuple("LaSEResult", ("ms", "lc", "lp", "LaSE"))
 
 class LaSEScorer(object):
 
@@ -59,9 +61,9 @@ class LaSEScorer(object):
         target_lang=None,
         alpha=6
     ):
-        return (
-            self._score_ms(target, prediction)
-            * self._score_lc(prediction, target_lang)
-            * self._score_lp(target, prediction, target_lang, alpha)
-        )
-    
+
+        ms = self._score_ms(target, prediction)
+        lc = self._score_lc(prediction, target_lang)
+        lp = self._score_lp(target, prediction, target_lang, alpha)
+        
+        return LaSEResult(ms, lc, lp, ms * lc * lp)

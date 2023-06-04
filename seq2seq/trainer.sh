@@ -12,8 +12,14 @@ parser.add_argument('--pivot_lang', type=str, default="english",
                     help='Pivot language (Applicable for many-to-one and one-to-many)')
 parser.add_argument('--sampling', type=str, default="multistage", choices=["multistage", "unistage"],
                     help='Sampling type (Applicable for many-to-many)')
+parser.add_argument('--minibatching', type=str, default="", choices=["fixed_src", "fixed_tgt", "ignored"],
+                    help='Minibatching (Applicable for many-to-many with multistage sampling)')
 parser.add_argument('--exclude_native', action='store_true',
                     default=False, help='Exclude the native-to-native filepairs during training')
+parser.add_argument('--per_lang_batch_size', default=32, type=int,
+                    help='Effective batch size per language')
+parser.add_argument('--copy_last_checkpoint', type=str, default="",
+                    help='If provided, copies the last checkpoint to this directory')
 EOF
 
 export BASE_DIR=$(realpath .)
@@ -22,9 +28,9 @@ export ROOT_INPUT_DIR="${BASE_DIR}/input"
 export ROOT_OUTPUT_DIR="${BASE_DIR}/output"
 
 
-export PREFIX="${TRAINING_TYPE}_${PIVOT_LANG}"
+export PREFIX="${TRAINING_TYPE}_${PIVOT_LANG}_${PER_LANG_BATCH_SIZE}"
 if [[ "$TRAINING_TYPE" = "m2m" ]]; then
-    PREFIX="${TRAINING_TYPE}_${SAMPLING}" 
+    PREFIX="${TRAINING_TYPE}_${SAMPLING}_${PER_LANG_BATCH_SIZE}" 
     OPTIONAL_ARGS=(
         "--multistage_upsampling_factors 0.5 0.75"
     )
@@ -32,6 +38,13 @@ if [[ "$TRAINING_TYPE" = "m2m" ]]; then
     if [[ "$SAMPLING" = "unistage" ]]; then
         OPTIONAL_ARGS=(
             "--upsampling_factor 0.25"
+        )   
+    fi
+
+    if [[ "$MINIBATCHING" != "" ]]; then
+        PREFIX="${TRAINING_TYPE}_${SAMPLING}_${MINIBATCHING}_${PER_LANG_BATCH_SIZE}" 
+        OPTIONAL_ARGS+=(
+            "--minibatching $MINIBATCHING"
         )   
     fi
     
@@ -70,7 +83,7 @@ export LINK_CACHE_ONLY=false
 
 # training settings
 export max_steps=25000
-export save_steps=5000
+export save_steps=25000
 export logging_steps=100
 
 # validation settings
@@ -100,7 +113,7 @@ export MAX_SOURCE_LENGTH=512
 export MAX_TARGET_LENGTH=84
 
 # cross lingual settings
-export per_lang_batch_size=32
+export per_lang_batch_size=$PER_LANG_BATCH_SIZE
 
 # logging settings
 export WANDB_PROJECT="Crossum"
@@ -129,3 +142,8 @@ python -m torch.distributed.launch \
     --reinitialize_langid_embeddings "bos" \
     --do_train \
     $(echo -n ${OPTIONAL_ARGS[@]}) |& tee "${OUTPUT_DIR}/run.log"
+
+if [[ "$COPY_LAST_CHECKPOINT" != "" ]]; then
+    mkdir -p "$COPY_LAST_CHECKPOINT"
+    cp -r "${OUTPUT_DIR}/checkpoint-${max_steps}" "${COPY_LAST_CHECKPOINT}/${BASENAME}"
+fi

@@ -3,7 +3,7 @@ We use a modified fork of [huggingface transformers](https://github.com/huggingf
 ## Setup
 
 ```bash
-$ git clone https://github.com/csebuetnlp/crossum
+$ git clone https://github.com/csebuetnlp/CrossSum
 $ cd crossum/seq2seq
 $ conda create python==3.7.9 pytorch==1.7.1 torchvision==0.8.2 torchaudio==0.7.2 cudatoolkit=10.2 -c pytorch -p ./env
 $ conda activate ./env # or source activate ./env (for older versions of anaconda)
@@ -14,7 +14,7 @@ $ bash setup.sh
 
 ## Downloading data
 
-This script downloads the metadata-stripped version of the dataset required for training.
+This script downloads the metadata-stripped version of the dataset required for training. The extracted files will be saved inside the `dataset/` directory.
 
 ```bash
 $ bash download_data.sh
@@ -28,8 +28,7 @@ To see the list of all available options related to training, do `python pipelin
 
 * See available training settings: `bash trainer.sh -h`. You can try out different training hyperparameters by modifying the default values in this script.
 
-Some sample commands for training on a 8 GPU node are given below. 
-For multi-node usage with SLURM, refer to [job.sh]().
+Some sample commands for training on a 8 GPU node are given below. More can be found in [training_runner.sh](training_runner.sh).
 
 ```bash
 bash trainer.sh --ngpus 8 --training_type m2m --sampling multistage # trains the many-to-many model with multistage sampling
@@ -55,3 +54,4 @@ python evaluator.py \
     --xlingual_summarization_model_name_or_path <path/to/model/directory>
 ```
 
+More detailed examples can be found in [evaluate.sh](evaluate.sh) and [evaluation_runner.sh](evaluation_runner.sh)
