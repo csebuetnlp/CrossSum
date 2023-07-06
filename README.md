@@ -2,6 +2,8 @@
 
 This repository contains the code, data, and models of the paper titled [**"CrossSum: Beyond English-Centric Cross-Lingual Abstractive Text Summarization for 1500+ Language Pairs"**](https://arxiv.org/abs/2112.08804) accepted for publication in Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (ACL’23), July 9-14, 2023.
 
+## Updates
+* An enhanced version of our m2m model is now availabe at [Huggingface Model Hub](https://huggingface.co/csebuetnlp/mT5_m2m_crossSum_enhanced)
 
 ## Table of Contents
 
