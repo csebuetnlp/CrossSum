@@ -230,6 +230,7 @@ def summarize_xlingual(
     input_dir,
     output_dir,
     tgt_lang,
+    args
 ):
     if os.path.isfile(os.path.join(output_dir, f"{args.data_type}_generations.txt")):
         return
