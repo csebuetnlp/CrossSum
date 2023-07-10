@@ -1,6 +1,6 @@
 # CrossSum
 
-This repository contains the code, data, and models of the paper titled [**"CrossSum: Beyond English-Centric Cross-Lingual Abstractive Text Summarization for 1500+ Language Pairs"**](https://arxiv.org/abs/2112.08804) accepted for publication in Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (ACL’23), July 9-14, 2023.
+This repository contains the code, data, and models of the paper titled [**"CrossSum: Beyond English-Centric Cross-Lingual Summarization for 1,500+ Language Pairs"**](https://aclanthology.org/2023.acl-long.143/) published in Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (ACL’23), July 9-14, 2023.
 
 ## Updates
 * An enhanced version of our m2m model is now availabe at [Huggingface Model Hub](https://huggingface.co/csebuetnlp/mT5_m2m_crossSum_enhanced)
@@ -126,14 +126,21 @@ Contents of this repository are restricted to only non-commercial research purpo
 ## Citation
 If you use any of the datasets, models or code modules, please cite the following paper:
 ```
-@article{bhattacharjee2021crosssum,
-  author    = {Abhik Bhattacharjee and Tahmid Hasan and Wasi Uddin Ahmad and Yuan-Fang Li and Yong-bin Kang and Rifat Shahriyar},
-  title     = {CrossSum: Beyond English-Centric Cross-Lingual Abstractive Text Summarization for 1500+ Language Pairs},
-  journal   = {CoRR},
-  volume    = {abs/2112.08804},
-  year      = {2021},
-  url       = {https://arxiv.org/abs/2112.08804},
-  eprinttype = {arXiv},
-  eprint    = {2112.08804}
+@inproceedings{bhattacharjee-etal-2023-crosssum,
+    title = "{C}ross{S}um: Beyond {E}nglish-Centric Cross-Lingual Summarization for 1,500+ Language Pairs",
+    author = "Bhattacharjee, Abhik  and
+      Hasan, Tahmid  and
+      Ahmad, Wasi Uddin  and
+      Li, Yuan-Fang  and
+      Kang, Yong-Bin  and
+      Shahriyar, Rifat",
+    booktitle = "Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)",
+    month = jul,
+    year = "2023",
+    address = "Toronto, Canada",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2023.acl-long.143",
+    pages = "2541--2564",
+    abstract = "We present CrossSum, a large-scale cross-lingual summarization dataset comprising 1.68 million article-summary samples in 1,500+ language pairs. We create CrossSum by aligning parallel articles written in different languages via cross-lingual retrieval from a multilingual abstractive summarization dataset and perform a controlled human evaluation to validate its quality. We propose a multistage data sampling algorithm to effectively train a cross-lingual summarization model capable of summarizing an article in any target language. We also introduce LaSE, an embedding-based metric for automatically evaluating model-generated summaries. LaSE is strongly correlated with ROUGE and, unlike ROUGE, can be reliably measured even in the absence of references in the target language. Performance on ROUGE and LaSE indicate that our proposed model consistently outperforms baseline models. To the best of our knowledge, CrossSum is the largest cross-lingual summarization dataset and the first ever that is not centered around English. We are releasing the dataset, training and evaluation scripts, and models to spur future research on cross-lingual summarization. The resources can be found at https://github.com/csebuetnlp/CrossSum",
 }
 ```
