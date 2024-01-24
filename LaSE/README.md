@@ -29,7 +29,7 @@ pred_text = """prediction text"""
 ref_lang = "reference language name" # see the list of language names below
 
 
-score = scorer.compute(
+score = scorer.score(
     ref_text,
     pred_text,
     target_lang=ref_lang # language name of the reference text
