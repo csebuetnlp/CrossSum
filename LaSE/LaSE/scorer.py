@@ -18,52 +18,53 @@ class LaSEScorer(object):
         self.labse_model = SentenceTransformer('LaBSE', device=device, cache_folder=cache_dir)
         self.langid_model = load_langid_model(cache_dir)
 
-    def _score_ms(self, target, prediction):
-        """Computes meaning similarity score"""
+    def _score_ms(self, targets, predictions, batch_size):
+        """Computes batched meaning similarity score"""
 
-        target_emb = self.labse_model.encode(target, show_progress_bar=False)
-        prediction_emb = self.labse_model.encode(prediction, show_progress_bar=False)
+        embeddings = self.labse_model.encode(targets + predictions, batch_size=batch_size, show_progress_bar=False)
+        return (embeddings[:len(targets)] * embeddings[len(targets):]).sum(axis=1)
 
-        return target_emb.dot(prediction_emb)
-
-    def _score_lc(self, prediction, target_lang):
-        """Computes language confidence score"""
-        
+    def _score_lc(self, predictions, target_lang):
+        """Computes batched language confidence score"""
         target_lang_code = LANG2ISO.get(target_lang, None)
 
         if not target_lang_code or target_lang_code not in FASTTEXT_LANGS:
             logger.info(f"{target_lang} not reconginzed. language confidence set to 1.0")
-            return 1.0
-
-        langs, scores = self.langid_model.predict(prediction, k=176, threshold=-1.0)
-        idx = langs.index(f"__label__{target_lang_code}")
-
-        return 1.0 if idx == 0 else scores[idx]
-
-    def _score_lp(self, target, prediction, target_lang, alpha):
-        """Computes length penalty score"""
-        tokenizer = rouge_scorer.RougeScorer(None, lang=target_lang)._tokenizer
-        target_token_count = len(tokenizer(target))
-        prediction_token_count = len(tokenizer(prediction))
-
-        if prediction_token_count <= target_token_count + alpha:
-            score = 1.0
-        else:
-            score = np.exp(1 - (prediction_token_count / (target_token_count + alpha)))
-
-        return score
-
-
-    def score(
-        self, 
-        target, 
-        prediction,
-        target_lang=None,
-        alpha=6
-    ):
-
-        ms = self._score_ms(target, prediction)
-        lc = self._score_lc(prediction, target_lang)
-        lp = self._score_lp(target, prediction, target_lang, alpha)
+            return [1.0] * len(predictions)
         
-        return LaSEResult(ms, lc, lp, ms * lc * lp)
+        all_langs, all_scores = self.langid_model.predict(predictions, k=176, threshold=-1.0)
+        columns = np.asarray([langs.index(f"__label__{target_lang_code}") for langs in all_langs])
+        rows, all_scores = range(len(all_langs)), np.asarray(all_scores)
+
+        scores = all_scores[rows, columns]
+        scores[columns == 0] = 1.0
+
+        return scores
+
+    def _score_lp(self, targets, predictions, target_lang, alpha):
+        """Computes batched length penalty score"""
+        tokenizer = rouge_scorer.RougeScorer(None, lang=target_lang)._tokenizer
+        token_counts = np.asarray([len(tokenizer(s)) for s in targets + predictions])
+        target_token_counts = token_counts[:len(targets)]
+        prediction_token_counts = token_counts[len(targets):]
+
+        fractions = 1 - (prediction_token_counts / (target_token_counts + alpha))
+        return np.exp(fractions * (fractions <= 0.))
+
+    def batched_score(self, targets, predictions, target_lang=None, batch_size=32, alpha=6):
+        assert len(targets) == len(predictions)
+        batch_size = min(batch_size, len(targets))
+
+        ms_scores = self._score_ms(targets, predictions, batch_size)
+        lc_scores = self._score_lc(predictions, target_lang)
+        lp_scores = self._score_lp(targets, predictions, target_lang, alpha)
+        
+        return [
+            LaSEResult(ms, lc, lp, ms * lc * lp)
+            for ms, lc, lp in zip(ms_scores, lc_scores, lp_scores)
+        ]
+    
+    def score(self, target, prediction, target_lang=None, alpha=6):
+        return self.batched_score(
+            [target], [prediction], target_lang, 1, alpha
+        )[0]

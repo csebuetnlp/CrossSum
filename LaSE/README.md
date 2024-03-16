@@ -28,7 +28,6 @@ ref_text = """reference text"""
 pred_text = """prediction text"""
 ref_lang = "reference language name" # see the list of language names below
 
-
 score = scorer.score(
     ref_text,
     pred_text,
@@ -36,6 +35,22 @@ score = scorer.score(
 )
 
 print(score)
+>>> LaSEResult(ms=0.89, lc=0.92, lp=0.98, LaSE=0.802424)
+
+
+# with list of sentences
+list_of_references = ["reference1", "reference2", ...]
+list_of_predictions = ["predictions1", "predictions2", ...]
+
+scores = scorer.batched_score(
+    list_of_references,
+    list_of_predictions,
+    target_lang=ref_lang,
+    batch_size=32
+)
+
+>>> [LaSEResult(ms=0.89, lc=0.92, lp=0.98, LaSE=0.802424), LaSEResult(ms=0.89, lc=0.92, lp=0.98, LaSE=0.802424), ...] 
+
 ```
 
 * Available language names: `oromo`, `french`, `amharic`, `arabic`, `azerbaijani`, `bengali`, `burmese`, `chinese_simplified`, `chinese_traditional`, `welsh`, `english`, `kirundi`, `gujarati`, `hausa`, `hindi`, `igbo`, `indonesian`, `japanese`, `korean`, `kyrgyz`, `marathi`, `spanish`, `scottish_gaelic`, `nepali`, `pashto`, `persian`, `pidgin`, `portuguese`, `punjabi`, `russian`, `serbian_cyrillic`, `serbian_latin`, `sinhala`, `somali`, `swahili`, `tamil`, `telugu`, `thai`, `tigrinya`, `turkish`, `ukrainian`, `urdu`, `uzbek`, `vietnamese`, `yoruba`
